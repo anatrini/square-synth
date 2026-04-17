@@ -5773,6 +5773,7 @@ class FaustWasm2ScriptProcessor {
     async createsquareSynth(audioCtx, bufferSize) {
         const importObject = {
             env: {
+                memory: new WebAssembly.Memory({ initial: 256 }),
                 memoryBase: 0,
                 tableBase: 0,
                 _abs: Math.abs,

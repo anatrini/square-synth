@@ -25,7 +25,7 @@ const $divFaustUI = document.getElementById("div-faust-ui");
 
 /** @type {typeof AudioContext} */
 const AudioCtx = window.AudioContext || window.webkitAudioContext;
-const audioContext = new AudioCtx({ latencyHint: 0.00001 });
+const audioContext = new AudioCtx({ latencyHint: "interactive" });
 audioContext.destination.channelInterpretation = "discrete";
 audioContext.suspend();
 
@@ -107,32 +107,41 @@ async function activateMIDISensors() {
     // Import the create-node module
     const { connectToAudioInput, requestPermissions } = await import("./create-node.js");
 
-    // Request permission for sensors
-    await requestPermissions();
-
-    // Activate sensor listeners
-    if (!sensorHandlersBound) {
-        await faustNode.startSensors();
-        sensorHandlersBound = true;
-    }
-
-    // Initialize the MIDI setup
-    if (!midiHandlersBound) {
-        startMIDI();
-        midiHandlersBound = true;
-    }
-
-    // Connect the Faust node to the audio output
+    // Connect audio output FIRST — must always succeed regardless of sensors/MIDI
     faustNode.connect(audioContext.destination);
-
-    // Connect the Faust node to the audio input
-    if (faustNode.numberOfInputs > 0) {
-        await connectToAudioInput(audioContext, null, faustNode, null);
-    }
 
     // Resume the AudioContext
     if (audioContext.state === 'suspended') {
         await audioContext.resume();
+    }
+
+    // Connect audio input if needed
+    if (faustNode.numberOfInputs > 0) {
+        try {
+            await connectToAudioInput(audioContext, null, faustNode, null);
+        } catch (e) {
+            console.warn('Audio input not available:', e);
+        }
+    }
+
+    // Sensors and MIDI are optional — failure must not block audio
+    try {
+        await requestPermissions();
+        if (!sensorHandlersBound) {
+            await faustNode.startSensors();
+            sensorHandlersBound = true;
+        }
+    } catch (e) {
+        console.warn('Sensors not available:', e);
+    }
+
+    try {
+        if (!midiHandlersBound) {
+            startMIDI();
+            midiHandlersBound = true;
+        }
+    } catch (e) {
+        console.warn('MIDI not available:', e);
     }
 }
 
